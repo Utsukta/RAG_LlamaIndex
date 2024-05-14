@@ -1,6 +1,6 @@
 import os,tempfile,qdrant_client
 import streamlit as st
-from llama_index.core import SimpleDirectoryReader, StorageContext,ServiceContext,VectorStoreIndex
+from llama_index.core import SimpleDirectoryReader, StorageContext,ServiceContext,VectorStoreIndex,Settings
 from llama_index.core.node_parser import SentenceSplitter
 # from llama_index.llms.openai import OpenAI
 # from dotenv import load_dotenv
@@ -30,7 +30,7 @@ class App:
    #Here, we save the uploaded file
    def save_uploaded_file(self,uploaded_file):
         try:
-          with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
+          with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
               tmp_file.write(uploaded_file.getvalue())
               return tmp_file.name
         except Exception as e:
@@ -39,8 +39,8 @@ class App:
         
    #Next, we chunk the file
    def node_parser(self):
-      parser=SentenceSplitter(chunk_size=1024,chunk_overlap=20)
-      return parser
+      Settings.text_splitter=SentenceSplitter(chunk_size=1024,chunk_overlap=20)
+      return Settings.text_splitter
       
    #Here, we define our LLM model to use
    def llm_model(self):
@@ -51,8 +51,8 @@ class App:
       # llm=OpenAI(temperature=0.1,model="gpt-3.5-turbo-1106",api_key=openai_api_key)
 
       #For Ollama
-      llm=Ollama(model="llama3",request_timeout=120.0)
-      return llm
+      Settings.llm=Ollama(model="llama3",request_timeout=120.0)
+      return Settings.llm
        
    #Here, we select the embedding model
    def embedding_model(self):
@@ -61,11 +61,11 @@ class App:
          # embed_model=OpenAIEmbedding()
 
          #For Ollama
-         embed_model=OllamaEmbedding(model_name="llama2")
+         Settings.embed_model=OllamaEmbedding(model_name="llama2")
 
-         st.session_state['embed_model'] = embed_model
+         st.session_state['embed_model'] = Settings.embed_model
          # st.markdown(F"Embedding Model: {embed_model.model_name}")
-      return embed_model
+      return Settings.embed_model
       
    #Here, we define response synthesis method
    def response_synthesis_method(self):
@@ -80,29 +80,30 @@ class App:
    
    #Now, creating the rag pipeline
    def generate_rag_pipeline(self,file,llm,embed_model,node_parser,response_mode,vector_store):
+      
+      
       if vector_store is not None:
-         #Set storage context if vector store is not None
-         storage_context=StorageContext.from_defaults(vector_store=vector_store)
+        #Set storage context if vector store is not None
+        storage_context=StorageContext.from_defaults(vector_store=vector_store)
       else:
-         storage_context=None
-
+        storage_context=None
       #Create the service context
-      service_context=ServiceContext.from_defaults(llm=llm, embed_model=embed_model, node_parser=node_parser)
-
+    #   service_context=ServiceContext.from_defaults(llm=llm, embed_model=embed_model, node_parser=node_parser)
+    
       #Create the vector index
-      vector_index=VectorStoreIndex.from_documents(documents=file,storage_context=storage_context,service_context=service_context,show_progress=True)
+      vector_index=VectorStoreIndex.from_documents(documents=file,llm=llm,embed_model=embed_model,node_parser=node_parser,storage_context=storage_context,show_progress=True)
       if storage_context:
-         vector_index.storage_context.persist(persist_dir="persist_dir")
+        vector_index.storage_context.persist(persist_dir="persist_dir")
 
       #Create the query engine
       query_engine=vector_index.as_query_engine(response_mode=response_mode,verbose=True,)
       return query_engine
    
    #Here, we send the query
-   def send_query(self):
-      query=st.session_state['query']
-      response=f"Response for the query: {query}"
-      st.markdown(response)
+#    def send_query(self):
+#       query=st.session_state['query']
+#       response=f"Response for the query: {query}"
+#       st.markdown(response)
 
 
    def main(self):
@@ -137,11 +138,22 @@ class App:
 
       #After Generating the RAG pipeline
       if st.session_state.get('pipeline_generated',False):
-         query=st.text_input("Enter your query", key='query')
-         if st.button("send"):
+        if 'messages' not in st.session_state:
+            st.session_state["messages"]=[{"role": "assistant", "content": "How can I help you?"}]
+
+        for msg in st.session_state.messages:
+           st.chat_message(msg["role"]).write(msg['content'])
+
+        if prompt := st.chat_input("Enter your query", key='query'):
+            st.session_state.messages.append({'role':'user','content':prompt})
+            st.chat_message('user').write(prompt)
             if 'query_engine' in st.session_state:
-               response=st.session_state['query_engine'].query(query)
+               response=st.session_state['query_engine'].query(prompt)
                st.markdown(response)
+               msg=response
+               st.session_state.messages.append({'role':'assistant','content':msg})
+               st.chat_message("assistant").write(msg)
+            #    st.markdown(response)
             else:
                st.error("Query engine is not initialised")
 
