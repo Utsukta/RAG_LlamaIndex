@@ -1,6 +1,6 @@
 import os,tempfile,qdrant_client
 import streamlit as st
-from llama_index.core import SimpleDirectoryReader, StorageContext,ServiceContext,VectorStoreIndex,Settings
+from llama_index.core import SimpleDirectoryReader, StorageContext,VectorStoreIndex,Settings
 from llama_index.core.node_parser import SentenceSplitter
 # from llama_index.llms.openai import OpenAI
 # from dotenv import load_dotenv
@@ -8,19 +8,24 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.ollama import OllamaEmbedding
+from neo4j import GraphDatabase
+
 
 
 class App:
    def reset_pipeline_generated(self):
       if 'pipeline_generated' in st.session_state:
         st.session_state['pipeline_generated'] = False
+
+      if 'messages' in st.session_state:
+         del st.session_state['messages']
     
+
    #Here, we upload the file
    def upload_file(self):
         file = st.sidebar.file_uploader('Upload your document',on_change=self.reset_pipeline_generated)
         if file is not None:
            file_path=self.save_uploaded_file(file)
-
 
            if file_path:
               loaded_file=SimpleDirectoryReader(input_files=[file_path]).load_data()
@@ -61,7 +66,7 @@ class App:
          # embed_model=OpenAIEmbedding()
 
          #For Ollama
-         Settings.embed_model=OllamaEmbedding(model_name="llama2")
+         Settings.embed_model=OllamaEmbedding(model_name="snowflake-arctic-embed")
 
          st.session_state['embed_model'] = Settings.embed_model
          # st.markdown(F"Embedding Model: {embed_model.model_name}")
@@ -80,8 +85,7 @@ class App:
    
    #Now, creating the rag pipeline
    def generate_rag_pipeline(self,file,llm,embed_model,node_parser,response_mode,vector_store):
-      
-      
+
       if vector_store is not None:
         #Set storage context if vector store is not None
         storage_context=StorageContext.from_defaults(vector_store=vector_store)
@@ -95,8 +99,14 @@ class App:
       if storage_context:
         vector_index.storage_context.persist(persist_dir="persist_dir")
 
+      system_prompt = (
+   "You are an AI assistant specialized in providing information from the uploaded document. "
+   "Please ensure that your responses are strictly derived from the content of the document. "
+   "If the information is not found in the document, please indicate that explicitly."
+)
+
       #Create the query engine
-      query_engine=vector_index.as_query_engine(response_mode=response_mode,verbose=True,)
+      query_engine=vector_index.as_query_engine(response_mode=response_mode,verbose=True,system_prompt=system_prompt)
       return query_engine
    
    #Here, we send the query
@@ -147,13 +157,12 @@ class App:
         if prompt := st.chat_input("Enter your query", key='query'):
             st.session_state.messages.append({'role':'user','content':prompt})
             st.chat_message('user').write(prompt)
+            st.markdown("")
             if 'query_engine' in st.session_state:
-               response=st.session_state['query_engine'].query(prompt)
-               st.markdown(response)
-               msg=response
+               Message=st.session_state['query_engine'].query(prompt)
+               msg=Message.response
                st.session_state.messages.append({'role':'assistant','content':msg})
-               st.chat_message("assistant").write(msg)
-            #    st.markdown(response)
+               st.chat_message("assistant").write(msg)   
             else:
                st.error("Query engine is not initialised")
 
