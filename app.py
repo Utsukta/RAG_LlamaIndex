@@ -10,8 +10,6 @@ from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.ollama import OllamaEmbedding
 from neo4j import GraphDatabase
 
-
-
 class App:
    def reset_pipeline_generated(self):
       if 'pipeline_generated' in st.session_state:
@@ -19,7 +17,6 @@ class App:
 
       if 'messages' in st.session_state:
          del st.session_state['messages']
-    
 
    #Here, we upload the file
    def upload_file(self):
@@ -56,7 +53,7 @@ class App:
       # llm=OpenAI(temperature=0.1,model="gpt-3.5-turbo-1106",api_key=openai_api_key)
 
       #For Ollama
-      Settings.llm=Ollama(model="llama3",request_timeout=120.0)
+      Settings.llm=Ollama(model="llama3",request_timeout=120.0,temperature=0.2,top_p=0.5,top_k=40)
       return Settings.llm
        
    #Here, we select the embedding model
@@ -97,13 +94,15 @@ class App:
       #Create the vector index
       vector_index=VectorStoreIndex.from_documents(documents=file,llm=llm,embed_model=embed_model,node_parser=node_parser,storage_context=storage_context,show_progress=True)
       if storage_context:
-        vector_index.storage_context.persist(persist_dir="persist_dir")
+        vector_index.storage_context.persist(persist_dir="dir")
 
       system_prompt = (
    "You are an AI assistant specialized in providing information from the uploaded document. "
    "Please ensure that your responses are strictly derived from the content of the document. "
    "If the information is not found in the document, please indicate that explicitly."
 )
+
+
 
       #Create the query engine
       query_engine=vector_index.as_query_engine(response_mode=response_mode,verbose=True,system_prompt=system_prompt)
