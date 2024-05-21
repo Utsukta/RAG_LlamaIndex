@@ -96,24 +96,14 @@ class App:
       if storage_context:
         vector_index.storage_context.persist(persist_dir="dir")
 
-      system_prompt = (
-   "You are an AI assistant specialized in providing information from the uploaded document. "
-   "Please ensure that your responses are strictly derived from the content of the document. "
-   "If the information is not found in the document, please indicate that explicitly."
-)
-
-
-
+#       system_prompt = (
+#    "You are an AI assistant specialized in providing information from the uploaded document. "
+#    "Please ensure that your responses are strictly derived from the content of the document. "
+#    "If the information is not found in the document, please indicate that explicitly."
+# )
       #Create the query engine
-      query_engine=vector_index.as_query_engine(response_mode=response_mode,verbose=True,system_prompt=system_prompt)
+      query_engine=vector_index.as_query_engine(response_mode=response_mode,verbose=True)
       return query_engine
-   
-   #Here, we send the query
-#    def send_query(self):
-#       query=st.session_state['query']
-#       response=f"Response for the query: {query}"
-#       st.markdown(response)
-
 
    def main(self):
       st.set_page_config(page_title="QuickChat")
@@ -158,7 +148,13 @@ class App:
             st.chat_message('user').write(prompt)
             st.markdown("")
             if 'query_engine' in st.session_state:
-               Message=st.session_state['query_engine'].query(prompt)
+               system_prompt = (
+   "You are an AI assistant specialized in providing information from the uploaded document. "
+   "Please ensure that your responses are strictly derived from the content of the document. "
+   "If the information is not found in the document, please indicate that explicitly."
+)              
+               query_with_prompt=f"{system_prompt}\nUser query:{prompt}"
+               Message=st.session_state['query_engine'].query(query_with_prompt)
                msg=Message.response
                st.session_state.messages.append({'role':'assistant','content':msg})
                st.chat_message("assistant").write(msg)   
