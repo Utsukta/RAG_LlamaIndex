@@ -1,5 +1,5 @@
 import os
-import tempfile
+# import tempfile
 import qdrant_client
 import streamlit as st
 from llama_index.core import SimpleDirectoryReader, StorageContext, VectorStoreIndex, Settings
@@ -9,7 +9,7 @@ from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.core.indices.query.query_transform import HyDEQueryTransform
 from llama_index.core.query_engine import TransformQueryEngine
-from llama_index.core.postprocessor import LLMRerank
+# from llama_index.core.postprocessor import LLMRerank
 
 import nest_asyncio
 nest_asyncio.apply()
@@ -21,20 +21,29 @@ def reset_pipeline_generated():
 
 # Function to handle file upload
 def upload_file():
-    file = st.sidebar.file_uploader('Upload your document', on_change=reset_pipeline_generated)
-    if file:
-        file_path = save_uploaded_file(file)
-        if file_path:
-            loaded_file = SimpleDirectoryReader(input_files=[file_path]).load_data()
-            return loaded_file
+    files = st.sidebar.file_uploader('Upload your document', accept_multiple_files=True, on_change=reset_pipeline_generated)
+    file_paths = []
+    if files:
+        for file in files:
+            file_path = save_uploaded_file(file)
+            print(file_path)
+            if file_path:
+                file_paths.append(file_path)
+        loaded_file = SimpleDirectoryReader(input_files=file_paths).load_data()
+        return loaded_file
     return None
 
 # Function to save the uploaded file
 def save_uploaded_file(uploaded_file):
+    upload_dir = "uploaded_files"
+    if not os.path.exists(upload_dir):
+        os.makedirs(upload_dir)
+    
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
-            tmp_file.write(uploaded_file.getvalue())
-            return tmp_file.name
+        file_path = os.path.join(upload_dir, uploaded_file.name)
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getvalue())
+        return file_path
     except Exception as e:
         st.error(f"Error saving file: {e}")
         return None
@@ -48,7 +57,7 @@ def initialize_vector_store():
 # Main function
 def main():
     # Initialize models and settings
-    Settings.llm = Ollama(model="llama3", request_timeout=120.0)
+    Settings.llm = Ollama(model="llama3", request_timeout=400.0)
     Settings.embed_model = OllamaEmbedding(model_name="snowflake-arctic-embed")
     Settings.text_splitter = SemanticSplitterNodeParser(embed_model=Settings.embed_model)
 
