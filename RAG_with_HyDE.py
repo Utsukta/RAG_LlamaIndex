@@ -9,7 +9,6 @@ from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.core.indices.query.query_transform import HyDEQueryTransform
 from llama_index.core.query_engine import TransformQueryEngine
-from llama_index.core.postprocessor import LLMRerank
 
 import nest_asyncio
 nest_asyncio.apply()
@@ -22,6 +21,7 @@ def reset_pipeline_generated():
 # Function to handle file upload
 def upload_file():
     file = st.sidebar.file_uploader('Upload your document', on_change=reset_pipeline_generated)
+    st.sidebar.markdown("With Hyde")
     if file:
         file_path = save_uploaded_file(file)
         if file_path:
@@ -70,26 +70,20 @@ def main():
                 transformations=[Settings.text_splitter]
             )
 
-            index.storage_context.persist(persist_dir="dir")
+            index.storage_context.persist(persist_dir="SingleDoc_dir")
             # reranker = LLMRerank( choice_batch_size=6,  top_n=2, )
 
             query_engine = index.as_query_engine(
                 response_mode="tree_summarize",
                 verbose=True,
                 similarity_top_k=10,
-                # node_postprocessors=[
-                # #     LLMRerank(
-                # #     choice_batch_size=5,
-                # #     top_n=2,
-                # # )
-                #     reranker
-                # ]
             )
 
             hyde_transform = HyDEQueryTransform(include_original=True)
             hyde_query_engine = TransformQueryEngine(query_engine, hyde_transform)
-
+            
             st.session_state['hyde_query_engine'] = hyde_query_engine
+            st.session_state['hyde_transform']=hyde_transform
             st.session_state['pipeline_generated'] = True
 
     if st.session_state.get('pipeline_generated', False):
@@ -106,10 +100,17 @@ def main():
             if 'hyde_query_engine' in st.session_state:
                 system_prompt = (
                     "You are an AI assistant specialized in providing information from the uploaded document. "
-                    "Please ensure that your responses are strictly derived from the content of the document. "
+                    "Please consider all content of the document to find the answer of the user query"
+                    "Please ensure that your responses are derived only from the content of the document."
                     "If the information is not found in the document, please indicate that explicitly."
                 )
                 query_with_prompt = f"{system_prompt}\nUser query: {prompt}"
+                hyde=st.session_state['hyde_transform']
+
+                query_bundle =  hyde(query_with_prompt)
+                hyde_doc = query_bundle.embedding_strs[0]
+                print(hyde_doc)
+               
 
                 query_engine = st.session_state['hyde_query_engine']
                 response = query_engine.query(query_with_prompt)

@@ -7,12 +7,8 @@ from llama_index.core.node_parser import SemanticSplitterNodeParser,SentenceSpli
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.ollama import OllamaEmbedding
-from llama_index.core.indices.query.query_transform import HyDEQueryTransform
-from llama_index.core.query_engine import TransformQueryEngine
-from llama_index.core.postprocessor import LLMRerank
 from llama_index.retrievers.bm25 import BM25Retriever
 from llama_index.core.retrievers import BaseRetriever
-
 from llama_index.core.query_engine import RetrieverQueryEngine
 
 import nest_asyncio
@@ -34,14 +30,12 @@ class HybridRetriever(BaseRetriever):
 
         # combine the two lists of nodes
         all_nodes = []
-        print('a')
         node_ids = set()
         for n in bm25_nodes + vector_nodes:
             if n.node.node_id not in node_ids:
                 all_nodes.append(n)
                 node_ids.add(n.node.node_id)
         return all_nodes
-
 
 
 # Function to reset pipeline status
@@ -148,13 +142,21 @@ def main():
 
             if 'Retriever_query_engine' in st.session_state:
                 system_prompt = (
-                    "You are an AI assistant specialized in providing information from the uploaded document. "
-                    "Please consider all content of the document to find the answer of the user query"
-                    "Please ensure that your responses are derived only from the content of the document."
-                    "If the information is not found in the document, please indicate that explicitly."
-                )
-                query_with_prompt = f"{system_prompt}\nUser query: {prompt}"
+            """
+            You are a helpful AI assistant named QuickGPT, created by Quickfox Consulting. Your primary function is to provide comprehensive answers based solely on the information contained in the given context documents. Please adhere to the following guidelines:
 
+            Using the information contained in the context,
+            give a comprehensive answer to the question.
+            Respond only to the question asked, response should be concise and relevant to the question.
+            If the answer cannot be deduced from the given context, do not give an answer.
+            Context documents:
+            {context_str}
+            Your task is to provide detailed answers to user questions based exclusively on the above documents. 
+            Remember, if the information isn't in the context, simply state that you don't know.
+            </s>
+            """
+        )
+                query_with_prompt = f"{system_prompt}\nUser query: {prompt}"
 
                 retrieved_nodes = st.session_state['hybrid_retriever'].retrieve(query_with_prompt)
                 print("Here after calling retriever method")

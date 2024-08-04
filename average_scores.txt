@@ -1,0 +1,15 @@
+settings
+./output/rag_chunk:256_embeddings_False.json    0.857143
+./output/rag_chunk:512_embeddings_False.json    0.857143
+./output/rag_chunk:256_embeddings_True.json     0.892857
+./output/rag_chunk:200_embeddings.json          0.928571
+./output/rag_chunk:512_embeddings_True.json     0.928571
+
+
+
+settings
+./output/rag_chunk:256_embeddings_False.json    0.857143
+./output/rag_chunk:512_embeddings_False.json    0.857143
+./output/rag_chunk:256_embeddings_True.json     0.892857
+./output/rag_chunk:200_embeddings.json          0.928571
+./output/rag_chunk:512_embeddings_True.json     0.928571
